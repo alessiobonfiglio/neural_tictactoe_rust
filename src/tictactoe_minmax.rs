@@ -78,7 +78,7 @@ impl Minmax {
 
         match player {
             X => {
-                self.result.insert(state.clone(), res);
+                self.result.insert(state, res);
                 res.into_iter().flatten().max().unwrap()
             }
             O => res.into_iter().flatten().min().unwrap(),
