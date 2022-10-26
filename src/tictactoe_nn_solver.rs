@@ -1,10 +1,12 @@
-use console::Term;
+use std::mem;
+
+use console::{style, Term};
 use nalgebra::{Const, SMatrix, SVector};
 use rand::prelude::*;
 use rand_distr::Normal;
 
+use crate::{TICTACTOE_SIZE, TicTacToeCell, TicTacToePlayer, TicTacToeState};
 use crate::TICTACTOE_GRID_SIZE;
-use crate::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_SIZE};
 
 pub struct TicTacToeNNSolver<const H: usize> {
     hidden_layer_weights: SMatrix<f32, H, TICTACTOE_GRID_SIZE>,
@@ -15,7 +17,7 @@ pub struct TicTacToeNNSolver<const H: usize> {
 
 impl<const H: usize> TicTacToeNNSolver<H> {
     pub fn new<R: Rng + ?Sized>(r: &mut R) -> Self {
-        // He initialization for ReLU and sigmoid neurons
+        // He initialization for re_lu and sigmoid neurons
         let relu_normal = Normal::new(0., (4. / (H + TICTACTOE_GRID_SIZE) as f32).sqrt()).unwrap();
         let sigmoid_normal = Normal::new(0., (32. / (H + TICTACTOE_GRID_SIZE) as f32).sqrt()).unwrap();
 
@@ -27,17 +29,26 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         }
     }
 
+    pub fn get_parameters_size(&self) -> (usize, usize, usize, usize) {
+        (
+            mem::size_of_val(&self.hidden_layer_weights),
+            mem::size_of_val(&self.hidden_layer_bias),
+            mem::size_of_val(&self.output_layer_weights),
+            mem::size_of_val(&self.output_layer_bias),
+        )
+    }
+
     pub fn inference(&self, state: TicTacToeState) -> SMatrix<bool, TICTACTOE_SIZE, TICTACTOE_SIZE> {
         let x = SMatrix::<f32, TICTACTOE_SIZE, TICTACTOE_SIZE>::from_fn(|i, j| match state[i][j] {
             TicTacToeCell::Empty => 0.,
             TicTacToeCell::Assigned(TicTacToePlayer::X) => 1.,
             TicTacToeCell::Assigned(TicTacToePlayer::O) => -1.,
         })
-        .reshape_generic(Const::<TICTACTOE_GRID_SIZE>, Const::<1>);
+            .reshape_generic(Const::<TICTACTOE_GRID_SIZE>, Const::<1>);
 
         let (y, _) = self.forward::<1>(x);
 
-        // instead of apply sigmoid, just check if y > 0 (same as Sigmoid(y) > 0.5)
+        // instead of apply sigmoid, just check if y > 0 (same as sigmoid(y) > 0.5)
         y.map(|y| y > 0.).reshape_generic(Const::<TICTACTOE_SIZE>, Const::<TICTACTOE_SIZE>)
     }
 
@@ -70,11 +81,11 @@ impl<const H: usize> TicTacToeNNSolver<H> {
 
                 // forward pass
                 let (out, hidden_layer_out) = self.forward(xx);
-                loss += out.zip_map(&yy, BCEWithLogits).mean();
+                loss += out.zip_map(&yy, bce_with_logits).mean();
                 corrects += out.zip_map(&yy, |x, y| ((x > 0.) == (y > 0.5)) as i32).sum();
 
                 // backward pass
-                let loss_grad = out.zip_map(&yy, BCEWithLogits_backward) / out.len() as f32;
+                let loss_grad = out.zip_map(&yy, bce_with_logits_backward) / out.len() as f32;
                 let grad = self.backward(loss_grad, hidden_layer_out, xx);
 
                 optimizer.step(self, grad);
@@ -82,7 +93,8 @@ impl<const H: usize> TicTacToeNNSolver<H> {
             loss /= steps_per_epoch as f32;
             let accuracy = corrects as f32 / (9 * ds_len) as f32;
             term.clear_last_lines(1).unwrap();
-            term.write_line(&format!("Epoch #{epoch_counter}\t loss: {:.6}\t accuracy: {:.6}", loss, accuracy)).unwrap();
+            term.write_line(&format!("{}\t loss: {:.6}\t accuracy: {:.6}", style(format!("Epoch #{epoch_counter}")).bold(), loss, accuracy))
+                .unwrap();
 
             if corrects as usize == 9 * ds_len || stop_condition.should_stop(epoch_counter, accuracy, loss) {
                 break;
@@ -108,7 +120,7 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         //   add bias
         hidden_layer_output.column_iter_mut().for_each(|mut c| c += self.hidden_layer_bias);
         //    apply relu
-        hidden_layer_output.apply(|x| *x = ReLU(*x));
+        hidden_layer_output.apply(|x| *x = re_lu(*x));
 
         // output layer
         //    dot product -> xh1*wo1 + ... + xhH*woH
@@ -128,7 +140,7 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         let output_layer_bias_grad = loss_grad.column_mean();
         let output_layer_weights_grad = (loss_grad * hidden_layer_out.transpose()) / BS as f32;
 
-        // compute gradient of the hidden layer output passing through the ReLU function
+        // compute gradient of the hidden layer output passing through the re_lu function
         let hidden_layer_output_grad = self
             .output_layer_weights
             .tr_mul(&loss_grad)
@@ -165,25 +177,25 @@ impl TrainStopCondition {
 }
 
 #[inline(always)]
-fn ReLU(x: f32) -> f32 {
+fn re_lu(x: f32) -> f32 {
     let x = x.to_bits() as i32;
     f32::from_bits((x & !(x >> 31)) as u32)
 }
 
 #[inline(always)]
-fn Sigmoid(x: f32) -> f32 {
+fn sigmoid(x: f32) -> f32 {
     1. / (1. + (-x).exp())
 }
 
 #[inline(always)]
-fn BCEWithLogits(x: f32, y: f32) -> f32 {
-    let t = ReLU(-x);
+fn bce_with_logits(x: f32, y: f32) -> f32 {
+    let t = re_lu(-x);
     (1. - y) * x + t + ((-t).exp() + (-x - t).exp()).ln()
 }
 
 #[inline(always)]
-fn BCEWithLogits_backward(x: f32, y: f32) -> f32 {
-    Sigmoid(x) - y
+fn bce_with_logits_backward(x: f32, y: f32) -> f32 {
+    sigmoid(x) - y
 }
 
 struct Adam<const H: usize> {
@@ -242,7 +254,8 @@ impl<const H: usize> Adam<H> {
         self.m.output_layer_weights = self.beta1 * self.m.output_layer_weights + (1. - self.beta1) * grad.output_layer_weights;
         self.m.output_layer_bias = self.beta1 * self.m.output_layer_bias + (1. - self.beta1) * grad.output_layer_bias;
 
-        self.v.hidden_layer_weights = self.beta2 * self.v.hidden_layer_weights + (1. - self.beta2) * (grad.hidden_layer_weights.component_mul(&grad.hidden_layer_weights));
+        self.v.hidden_layer_weights =
+            self.beta2 * self.v.hidden_layer_weights + (1. - self.beta2) * (grad.hidden_layer_weights.component_mul(&grad.hidden_layer_weights));
         self.v.hidden_layer_bias = self.beta2 * self.v.hidden_layer_bias + (1. - self.beta2) * grad.hidden_layer_bias.component_mul(&grad.hidden_layer_bias);
         self.v.output_layer_weights = self.beta2 * self.v.output_layer_weights + (1. - self.beta2) * grad.output_layer_weights.component_mul(&grad.output_layer_weights);
         self.v.output_layer_bias = self.beta2 * self.v.output_layer_bias + (1. - self.beta2) * grad.output_layer_bias.component_mul(&grad.output_layer_bias);
