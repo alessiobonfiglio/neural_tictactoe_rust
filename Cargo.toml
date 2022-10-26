@@ -9,7 +9,9 @@ edition = "2021"
 byte-unit = "4.0.14"
 rand = "0.8.5"
 rand_distr = "0.4.3"
-nalgebra = "0.31.2"
+nalgebra = { version = "0.31.2", features = ["serde-serialize"] }
 console = "0.15.2"
 dialoguer = "0.10.2"
+serde = { version = "1.0.147", features = ["derive"] }
+serde_json = "1.0.87"
 

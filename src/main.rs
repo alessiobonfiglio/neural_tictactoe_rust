@@ -1,7 +1,7 @@
 use std::collections::HashMap;
-use std::mem;
 use std::mem::size_of;
 use std::time::Instant;
+use std::{fs, mem};
 
 use byte_unit::Byte;
 use console::style;
@@ -9,9 +9,9 @@ use nalgebra::{SMatrix, SVector};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
-use dialoguer::{Input, Select, theme::ColorfulTheme};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 
-use crate::tictactoe_minmax::{Minmax, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE, TicTacToeCell, TicTacToePlayer, TicTacToeState};
+use crate::tictactoe_minmax::{Minmax, TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE};
 use crate::tictactoe_solver_nn::{TicTacToeSolverNN, TrainStopCondition};
 use crate::TicTacToeCell::{Assigned, Empty};
 use crate::TrainStopCondition::{Accuracy, Epoch, Loss, Perfect};
@@ -70,7 +70,7 @@ fn main() {
             network.get_parameters_size().0 / size_of::<f32>(),
             network.get_parameters_size().1 / size_of::<f32>()
         ))
-            .green(),
+        .green(),
         style(Byte::from_bytes((network.get_parameters_size().0 + network.get_parameters_size().1) as u128).get_appropriate_unit(true)).green()
     );
     println!("\t           |\n\t           V");
@@ -82,17 +82,19 @@ fn main() {
             network.get_parameters_size().2 / size_of::<f32>(),
             network.get_parameters_size().3 / size_of::<f32>()
         ))
-            .green(),
+        .green(),
         style(Byte::from_bytes((network.get_parameters_size().2 + network.get_parameters_size().3) as u128).get_appropriate_unit(true)).green()
     );
     println!("Time elapsed for constructing Neural Network Model: {:?}\n", style(duration).green());
 
+    let mut skip_traing = false;
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select how to train the network")
         .item("Until it learns the task perfectly")
         .item("For a certain number of epochs at most")
         .item("Until it reaches a certain accuracy")
         .item("Until it reaches a certain loss")
+        .item("Skip training and load parameters from file")
         .default(0)
         .interact()
         .unwrap();
@@ -152,16 +154,56 @@ fn main() {
                 .unwrap();
             Loss(l.parse::<f32>().unwrap())
         }
+        4 => {
+            let path: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Enter the filename")
+                .validate_with(|input: &String| -> Result<(), &str> {
+                    match fs::read_to_string(input) {
+                        Ok(serialized) => {
+                            network = serde_json::from_str(&serialized).unwrap();
+                            skip_traing = true;
+                            Ok(())
+                        }
+                        Err(_) => Err("Impossible to read the file"),
+                    }
+                })
+                .interact_text()
+                .unwrap();
+            Perfect
+        }
         _ => panic!(),
     };
 
-    println!("{}", style("Begin training...").bold());
-    println!("\tBatch size: {}", style(BATCH_SIZE).green());
-    println!("\tLearning rate: {}\n", style(LEARNING_RATE).green());
-    let start = Instant::now();
-    network.train::<BATCH_SIZE, _>(dataset, LEARNING_RATE, train_stop_condition, &mut rng);
-    let duration = start.elapsed();
-    println!("Time elapsed for training the model: {:?}", style(duration).green());
+    if !skip_traing {
+        println!("{}", style("Begin training...").bold());
+        println!("\tBatch size: {}", style(BATCH_SIZE).green());
+        println!("\tLearning rate: {}\n", style(LEARNING_RATE).green());
+        let start = Instant::now();
+        network.train::<BATCH_SIZE, _>(dataset, LEARNING_RATE, train_stop_condition, &mut rng);
+        let duration = start.elapsed();
+        println!("Time elapsed for training the model: {:?}\n", style(duration).green());
+
+        loop {
+            if !Confirm::new()
+                .with_prompt("Do you want to save parameters to file?")
+                .default(false)
+                .interact()
+                .unwrap()
+            {
+                break;
+            }
+            let path: String = Input::with_theme(&ColorfulTheme::default())
+                .with_prompt("Enter the filename")
+                .interact_text()
+                .unwrap();
+            let serialized = serde_json::to_string(&network).unwrap();
+            if let Err(e) = fs::write(path, serialized) {
+                println!("{}", e);
+            } else {
+                break;
+            }
+        }
+    }
 }
 
 fn convert_minmax_results_to_dataset(

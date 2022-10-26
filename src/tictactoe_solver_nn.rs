@@ -5,9 +5,12 @@ use nalgebra::{Const, SMatrix, SVector};
 use rand::prelude::*;
 use rand_distr::Normal;
 
-use crate::{TICTACTOE_SIZE, TicTacToeCell, TicTacToePlayer, TicTacToeState};
-use crate::TICTACTOE_GRID_SIZE;
+use serde::{Deserialize, Serialize};
 
+use crate::TICTACTOE_GRID_SIZE;
+use crate::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_SIZE};
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TicTacToeSolverNN<const H: usize> {
     hidden_layer_weights: SMatrix<f32, H, TICTACTOE_GRID_SIZE>,
     hidden_layer_bias: SVector<f32, H>,
@@ -44,7 +47,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
             TicTacToeCell::Assigned(TicTacToePlayer::X) => 1.,
             TicTacToeCell::Assigned(TicTacToePlayer::O) => -1.,
         })
-            .reshape_generic(Const::<TICTACTOE_GRID_SIZE>, Const::<1>);
+        .reshape_generic(Const::<TICTACTOE_GRID_SIZE>, Const::<1>);
 
         let (y, _) = self.forward::<1>(x);
 
@@ -93,8 +96,13 @@ impl<const H: usize> TicTacToeSolverNN<H> {
             loss /= steps_per_epoch as f32;
             let accuracy = corrects as f32 / (9 * ds_len) as f32;
             term.clear_last_lines(1).unwrap();
-            term.write_line(&format!("{}\t loss: {:.6}\t accuracy: {:.6}", style(format!("Epoch #{epoch_counter}")).bold(), loss, accuracy))
-                .unwrap();
+            term.write_line(&format!(
+                "{}\t loss: {:.6}\t accuracy: {:.6}",
+                style(format!("Epoch #{epoch_counter}")).bold(),
+                loss,
+                accuracy
+            ))
+            .unwrap();
 
             if corrects as usize == 9 * ds_len || stop_condition.should_stop(epoch_counter, accuracy, loss) {
                 break;
