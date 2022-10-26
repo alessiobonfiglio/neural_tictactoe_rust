@@ -12,12 +12,12 @@ use rand::SeedableRng;
 use dialoguer::{Input, Select, theme::ColorfulTheme};
 
 use crate::tictactoe_minmax::{Minmax, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE, TicTacToeCell, TicTacToePlayer, TicTacToeState};
-use crate::tictactoe_nn_solver::{TicTacToeNNSolver, TrainStopCondition};
+use crate::tictactoe_solver_nn::{TicTacToeSolverNN, TrainStopCondition};
 use crate::TicTacToeCell::{Assigned, Empty};
 use crate::TrainStopCondition::{Accuracy, Epoch, Loss, Perfect};
 
 mod tictactoe_minmax;
-mod tictactoe_nn_solver;
+mod tictactoe_solver_nn;
 
 const HIDDEN_LAYER_SIZE: usize = 64;
 const BATCH_SIZE: usize = 36;
@@ -58,7 +58,7 @@ fn main() {
 
     println!("{}", style("Constructing Neural Network Model...").bold());
     let start = Instant::now();
-    let mut network = TicTacToeNNSolver::<HIDDEN_LAYER_SIZE>::new(&mut rng);
+    let mut network = TicTacToeSolverNN::<HIDDEN_LAYER_SIZE>::new(&mut rng);
     let duration = start.elapsed();
     println!("\t      Input layer            (size: {})", style(TICTACTOE_GRID_SIZE).green());
     println!("\t           |\n\t           V");
@@ -121,7 +121,7 @@ fn main() {
                 .with_prompt("Enter the target accuracy")
                 .validate_with(|input: &String| -> Result<(), &str> {
                     if let Ok(n) = input.parse::<f32>() {
-                        if (0...=1.).contains(&n) {
+                        if (0.0..=1.0).contains(&n) {
                             Ok(())
                         } else {
                             Err("Must be between 0.0 an 1.0")

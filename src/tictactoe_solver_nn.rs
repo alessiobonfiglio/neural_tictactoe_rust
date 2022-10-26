@@ -8,20 +8,20 @@ use rand_distr::Normal;
 use crate::{TICTACTOE_SIZE, TicTacToeCell, TicTacToePlayer, TicTacToeState};
 use crate::TICTACTOE_GRID_SIZE;
 
-pub struct TicTacToeNNSolver<const H: usize> {
+pub struct TicTacToeSolverNN<const H: usize> {
     hidden_layer_weights: SMatrix<f32, H, TICTACTOE_GRID_SIZE>,
     hidden_layer_bias: SVector<f32, H>,
     output_layer_weights: SMatrix<f32, TICTACTOE_GRID_SIZE, H>,
     output_layer_bias: SVector<f32, TICTACTOE_GRID_SIZE>,
 }
 
-impl<const H: usize> TicTacToeNNSolver<H> {
+impl<const H: usize> TicTacToeSolverNN<H> {
     pub fn new<R: Rng + ?Sized>(r: &mut R) -> Self {
         // He initialization for re_lu and sigmoid neurons
         let relu_normal = Normal::new(0., (4. / (H + TICTACTOE_GRID_SIZE) as f32).sqrt()).unwrap();
         let sigmoid_normal = Normal::new(0., (32. / (H + TICTACTOE_GRID_SIZE) as f32).sqrt()).unwrap();
 
-        TicTacToeNNSolver {
+        TicTacToeSolverNN {
             hidden_layer_weights: SMatrix::from_fn(|_, _| relu_normal.sample(r)),
             hidden_layer_bias: SVector::from_fn(|_, _| relu_normal.sample(r)),
             output_layer_weights: SMatrix::from_fn(|_, _| sigmoid_normal.sample(r)),
@@ -149,7 +149,7 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         let hidden_layer_bias_grad = hidden_layer_output_grad.column_mean();
         let hidden_layer_weights_grad = (hidden_layer_output_grad * x.transpose()) / BS as f32;
 
-        TicTacToeNNSolver {
+        TicTacToeSolverNN {
             hidden_layer_weights: hidden_layer_weights_grad,
             hidden_layer_bias: hidden_layer_bias_grad,
             output_layer_weights: output_layer_weights_grad,
@@ -202,8 +202,8 @@ struct Adam<const H: usize> {
     lr: f32,
     beta1: f32,
     beta2: f32,
-    m: TicTacToeNNSolver<H>,
-    v: TicTacToeNNSolver<H>,
+    m: TicTacToeSolverNN<H>,
+    v: TicTacToeSolverNN<H>,
     beta1t: f32,
     beta2t: f32,
 }
@@ -214,13 +214,13 @@ impl<const H: usize> Adam<H> {
             lr,
             beta1,
             beta2,
-            m: TicTacToeNNSolver {
+            m: TicTacToeSolverNN {
                 hidden_layer_weights: SMatrix::zeros(),
                 hidden_layer_bias: SVector::zeros(),
                 output_layer_weights: SMatrix::zeros(),
                 output_layer_bias: SVector::zeros(),
             },
-            v: TicTacToeNNSolver {
+            v: TicTacToeSolverNN {
                 hidden_layer_weights: SMatrix::zeros(),
                 hidden_layer_bias: SVector::zeros(),
                 output_layer_weights: SMatrix::zeros(),
@@ -232,13 +232,13 @@ impl<const H: usize> Adam<H> {
     }
 
     fn reset(&mut self) {
-        self.m = TicTacToeNNSolver {
+        self.m = TicTacToeSolverNN {
             hidden_layer_weights: SMatrix::zeros(),
             hidden_layer_bias: SVector::zeros(),
             output_layer_weights: SMatrix::zeros(),
             output_layer_bias: SVector::zeros(),
         };
-        self.v = TicTacToeNNSolver {
+        self.v = TicTacToeSolverNN {
             hidden_layer_weights: SMatrix::zeros(),
             hidden_layer_bias: SVector::zeros(),
             output_layer_weights: SMatrix::zeros(),
@@ -248,7 +248,7 @@ impl<const H: usize> Adam<H> {
         self.beta2t = 1.;
     }
 
-    fn step(&mut self, nn: &mut TicTacToeNNSolver<H>, grad: TicTacToeNNSolver<H>) {
+    fn step(&mut self, nn: &mut TicTacToeSolverNN<H>, grad: TicTacToeSolverNN<H>) {
         self.m.hidden_layer_weights = self.beta1 * self.m.hidden_layer_weights + (1. - self.beta1) * grad.hidden_layer_weights;
         self.m.hidden_layer_bias = self.beta1 * self.m.hidden_layer_bias + (1. - self.beta1) * grad.hidden_layer_bias;
         self.m.output_layer_weights = self.beta1 * self.m.output_layer_weights + (1. - self.beta1) * grad.output_layer_weights;
