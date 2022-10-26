@@ -17,8 +17,7 @@ impl<const H: usize> TicTacToeNNSolver<H> {
     pub fn new<R: Rng + ?Sized>(r: &mut R) -> Self {
         // He initialization for ReLU and sigmoid neurons
         let relu_normal = Normal::new(0., (4. / (H + TICTACTOE_GRID_SIZE) as f32).sqrt()).unwrap();
-        let sigmoid_normal =
-            Normal::new(0., (32. / (H + TICTACTOE_GRID_SIZE) as f32).sqrt()).unwrap();
+        let sigmoid_normal = Normal::new(0., (32. / (H + TICTACTOE_GRID_SIZE) as f32).sqrt()).unwrap();
 
         TicTacToeNNSolver {
             hidden_layer_weights: SMatrix::from_fn(|_, _| relu_normal.sample(r)),
@@ -28,10 +27,7 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         }
     }
 
-    pub fn inference(
-        &self,
-        state: TicTacToeState,
-    ) -> SMatrix<bool, TICTACTOE_SIZE, TICTACTOE_SIZE> {
+    pub fn inference(&self, state: TicTacToeState) -> SMatrix<bool, TICTACTOE_SIZE, TICTACTOE_SIZE> {
         let x = SMatrix::<f32, TICTACTOE_SIZE, TICTACTOE_SIZE>::from_fn(|i, j| match state[i][j] {
             TicTacToeCell::Empty => 0.,
             TicTacToeCell::Assigned(TicTacToePlayer::X) => 1.,
@@ -42,16 +38,12 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         let (y, _) = self.forward::<1>(x);
 
         // instead of apply sigmoid, just check if y > 0 (same as Sigmoid(y) > 0.5)
-        y.map(|y| y > 0.)
-            .reshape_generic(Const::<TICTACTOE_SIZE>, Const::<TICTACTOE_SIZE>)
+        y.map(|y| y > 0.).reshape_generic(Const::<TICTACTOE_SIZE>, Const::<TICTACTOE_SIZE>)
     }
 
     pub fn train<const BS: usize, R: Rng + ?Sized>(
         &mut self,
-        dataset: (
-            Vec<SVector<f32, TICTACTOE_GRID_SIZE>>,
-            Vec<SVector<f32, TICTACTOE_GRID_SIZE>>,
-        ),
+        dataset: (Vec<SVector<f32, TICTACTOE_GRID_SIZE>>, Vec<SVector<f32, TICTACTOE_GRID_SIZE>>),
         lr: f32,
         stop_condition: TrainStopCondition,
         r: &mut R,
@@ -79,9 +71,7 @@ impl<const H: usize> TicTacToeNNSolver<H> {
                 // forward pass
                 let (out, hidden_layer_out) = self.forward(xx);
                 loss += out.zip_map(&yy, BCEWithLogits).mean();
-                corrects += out
-                    .zip_map(&yy, |x, y| ((x > 0.) == (y > 0.5)) as i32)
-                    .sum();
+                corrects += out.zip_map(&yy, |x, y| ((x > 0.) == (y > 0.5)) as i32).sum();
 
                 // backward pass
                 let loss_grad = out.zip_map(&yy, BCEWithLogits_backward) / out.len() as f32;
@@ -92,15 +82,9 @@ impl<const H: usize> TicTacToeNNSolver<H> {
             loss /= steps_per_epoch as f32;
             let accuracy = corrects as f32 / (9 * ds_len) as f32;
             term.clear_last_lines(1).unwrap();
-            term.write_line(&format!(
-                "Epoch #{epoch_counter}\t loss: {:.6}\t accuracy: {:.6}",
-                loss, accuracy
-            ))
-            .unwrap();
+            term.write_line(&format!("Epoch #{epoch_counter}\t loss: {:.6}\t accuracy: {:.6}", loss, accuracy)).unwrap();
 
-            if corrects as usize == 9 * ds_len
-                || stop_condition.should_stop(epoch_counter, accuracy, loss)
-            {
+            if corrects as usize == 9 * ds_len || stop_condition.should_stop(epoch_counter, accuracy, loss) {
                 break;
             }
 
@@ -108,11 +92,7 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         }
     }
 
-    fn shuffle_dataset<R: Rng + ?Sized>(
-        x: &mut [SVector<f32, TICTACTOE_GRID_SIZE>],
-        y: &mut [SVector<f32, TICTACTOE_GRID_SIZE>],
-        r: &mut R,
-    ) {
+    fn shuffle_dataset<R: Rng + ?Sized>(x: &mut [SVector<f32, TICTACTOE_GRID_SIZE>], y: &mut [SVector<f32, TICTACTOE_GRID_SIZE>], r: &mut R) {
         let ds_len = x.len();
         for i in 0..ds_len {
             let next = r.gen_range(i..ds_len);
@@ -121,17 +101,12 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         }
     }
 
-    fn forward<const BS: usize>(
-        &self,
-        x: SMatrix<f32, TICTACTOE_GRID_SIZE, BS>,
-    ) -> (SMatrix<f32, TICTACTOE_GRID_SIZE, BS>, SMatrix<f32, H, BS>) {
+    fn forward<const BS: usize>(&self, x: SMatrix<f32, TICTACTOE_GRID_SIZE, BS>) -> (SMatrix<f32, TICTACTOE_GRID_SIZE, BS>, SMatrix<f32, H, BS>) {
         // hidden layer
         //   dot product -> x1*wh1 + ... + x9*wh9
         let mut hidden_layer_output = self.hidden_layer_weights * x;
         //   add bias
-        hidden_layer_output
-            .column_iter_mut()
-            .for_each(|mut c| c += self.hidden_layer_bias);
+        hidden_layer_output.column_iter_mut().for_each(|mut c| c += self.hidden_layer_bias);
         //    apply relu
         hidden_layer_output.apply(|x| *x = ReLU(*x));
 
@@ -139,9 +114,7 @@ impl<const H: usize> TicTacToeNNSolver<H> {
         //    dot product -> xh1*wo1 + ... + xhH*woH
         let mut output = self.output_layer_weights * hidden_layer_output;
         //    add bias
-        output
-            .column_iter_mut()
-            .for_each(|mut c| c += self.output_layer_bias);
+        output.column_iter_mut().for_each(|mut c| c += self.output_layer_bias);
 
         (output, hidden_layer_output)
     }
@@ -264,35 +237,15 @@ impl<const H: usize> Adam<H> {
     }
 
     fn step(&mut self, nn: &mut TicTacToeNNSolver<H>, grad: TicTacToeNNSolver<H>) {
-        self.m.hidden_layer_weights = self.beta1 * self.m.hidden_layer_weights
-            + (1. - self.beta1) * grad.hidden_layer_weights;
-        self.m.hidden_layer_bias =
-            self.beta1 * self.m.hidden_layer_bias + (1. - self.beta1) * grad.hidden_layer_bias;
-        self.m.output_layer_weights = self.beta1 * self.m.output_layer_weights
-            + (1. - self.beta1) * grad.output_layer_weights;
-        self.m.output_layer_bias =
-            self.beta1 * self.m.output_layer_bias + (1. - self.beta1) * grad.output_layer_bias;
+        self.m.hidden_layer_weights = self.beta1 * self.m.hidden_layer_weights + (1. - self.beta1) * grad.hidden_layer_weights;
+        self.m.hidden_layer_bias = self.beta1 * self.m.hidden_layer_bias + (1. - self.beta1) * grad.hidden_layer_bias;
+        self.m.output_layer_weights = self.beta1 * self.m.output_layer_weights + (1. - self.beta1) * grad.output_layer_weights;
+        self.m.output_layer_bias = self.beta1 * self.m.output_layer_bias + (1. - self.beta1) * grad.output_layer_bias;
 
-        self.v.hidden_layer_weights = self.beta2 * self.v.hidden_layer_weights
-            + (1. - self.beta2)
-                * (grad
-                    .hidden_layer_weights
-                    .component_mul(&grad.hidden_layer_weights));
-        self.v.hidden_layer_bias = self.beta2 * self.v.hidden_layer_bias
-            + (1. - self.beta2)
-                * grad
-                    .hidden_layer_bias
-                    .component_mul(&grad.hidden_layer_bias);
-        self.v.output_layer_weights = self.beta2 * self.v.output_layer_weights
-            + (1. - self.beta2)
-                * grad
-                    .output_layer_weights
-                    .component_mul(&grad.output_layer_weights);
-        self.v.output_layer_bias = self.beta2 * self.v.output_layer_bias
-            + (1. - self.beta2)
-                * grad
-                    .output_layer_bias
-                    .component_mul(&grad.output_layer_bias);
+        self.v.hidden_layer_weights = self.beta2 * self.v.hidden_layer_weights + (1. - self.beta2) * (grad.hidden_layer_weights.component_mul(&grad.hidden_layer_weights));
+        self.v.hidden_layer_bias = self.beta2 * self.v.hidden_layer_bias + (1. - self.beta2) * grad.hidden_layer_bias.component_mul(&grad.hidden_layer_bias);
+        self.v.output_layer_weights = self.beta2 * self.v.output_layer_weights + (1. - self.beta2) * grad.output_layer_weights.component_mul(&grad.output_layer_weights);
+        self.v.output_layer_bias = self.beta2 * self.v.output_layer_bias + (1. - self.beta2) * grad.output_layer_bias.component_mul(&grad.output_layer_bias);
 
         self.beta1t *= self.beta1;
         self.beta2t *= self.beta2;
@@ -302,30 +255,14 @@ impl<const H: usize> Adam<H> {
         let mt_output_layer_weights = self.m.output_layer_weights / (1. - self.beta1t);
         let mt_output_layer_bias = self.m.output_layer_bias / (1. - self.beta1t);
 
-        let vt_hidden_layer_weights =
-            (self.v.hidden_layer_weights / (1. - self.beta2t)).map(|x| x.sqrt());
-        let vt_hidden_layer_bias =
-            (self.v.hidden_layer_bias / (1. - self.beta2t)).map(|x| x.sqrt());
-        let vt_output_layer_weights =
-            (self.v.output_layer_weights / (1. - self.beta2t)).map(|x| x.sqrt());
-        let vt_output_layer_bias =
-            (self.v.output_layer_bias / (1. - self.beta2t)).map(|x| x.sqrt());
+        let vt_hidden_layer_weights = (self.v.hidden_layer_weights / (1. - self.beta2t)).map(|x| x.sqrt());
+        let vt_hidden_layer_bias = (self.v.hidden_layer_bias / (1. - self.beta2t)).map(|x| x.sqrt());
+        let vt_output_layer_weights = (self.v.output_layer_weights / (1. - self.beta2t)).map(|x| x.sqrt());
+        let vt_output_layer_bias = (self.v.output_layer_bias / (1. - self.beta2t)).map(|x| x.sqrt());
 
-        nn.hidden_layer_weights = nn.hidden_layer_weights
-            - self.lr
-                * mt_hidden_layer_weights
-                    .component_div(&vt_hidden_layer_weights.add_scalar(10f32.powi(-8)));
-        nn.hidden_layer_bias = nn.hidden_layer_bias
-            - self.lr
-                * mt_hidden_layer_bias
-                    .component_div(&vt_hidden_layer_bias.add_scalar(10f32.powi(-8)));
-        nn.output_layer_weights = nn.output_layer_weights
-            - self.lr
-                * mt_output_layer_weights
-                    .component_div(&vt_output_layer_weights.add_scalar(10f32.powi(-8)));
-        nn.output_layer_bias = nn.output_layer_bias
-            - self.lr
-                * mt_output_layer_bias
-                    .component_div(&vt_output_layer_bias.add_scalar(10f32.powi(-8)));
+        nn.hidden_layer_weights -= self.lr * mt_hidden_layer_weights.component_div(&vt_hidden_layer_weights.add_scalar(10f32.powi(-8)));
+        nn.hidden_layer_bias -= self.lr * mt_hidden_layer_bias.component_div(&vt_hidden_layer_bias.add_scalar(10f32.powi(-8)));
+        nn.output_layer_weights -= self.lr * mt_output_layer_weights.component_div(&vt_output_layer_weights.add_scalar(10f32.powi(-8)));
+        nn.output_layer_bias -= self.lr * mt_output_layer_bias.component_div(&vt_output_layer_bias.add_scalar(10f32.powi(-8)));
     }
 }

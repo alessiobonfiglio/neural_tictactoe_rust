@@ -8,7 +8,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng;
 
 use crate::tictactoe_minmax::{
-    Minmax, TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE,
+    Minmax, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE, TicTacToeCell, TicTacToePlayer, TicTacToeState,
 };
 use crate::tictactoe_nn_solver::{TicTacToeNNSolver, TrainStopCondition};
 use crate::TicTacToeCell::{Assigned, Empty};
