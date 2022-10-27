@@ -11,7 +11,7 @@ use crate::TICTACTOE_SIZE;
 /// Minmax solver for TicTacToe (X is the player of interest)
 pub struct Minmax {
     cache: HashMap<TicTacToeState, i32>,
-    result: HashMap<TicTacToeState, SMatrix<i32, TICTACTOE_SIZE, TICTACTOE_SIZE>>,
+    result: HashMap<TicTacToeState, SMatrix<Option<i32>, TICTACTOE_SIZE, TICTACTOE_SIZE>>,
 }
 
 impl Minmax {
@@ -19,7 +19,7 @@ impl Minmax {
     /// `initial_player` as the first playing player and
     /// return a 'HashMap' that maps each possible turn of player X to the
     /// value of each action he can perform in that turn
-    pub fn execute(initial_player: TicTacToePlayer) -> HashMap<TicTacToeState, SMatrix<i32, TICTACTOE_SIZE, TICTACTOE_SIZE>> {
+    pub fn execute(initial_player: TicTacToePlayer) -> HashMap<TicTacToeState, SMatrix<Option<i32>, TICTACTOE_SIZE, TICTACTOE_SIZE>> {
         let mut minmax = Minmax {
             cache: HashMap::new(),
             result: HashMap::new(),
@@ -35,8 +35,11 @@ impl Minmax {
             Some(O) => return -1,
             _ => (),
         };
+        if state.is_full() {
+            return 0;
+        }
 
-        let mut res = SMatrix::<i32, TICTACTOE_SIZE, TICTACTOE_SIZE>::zeros();
+        let mut res = SMatrix::<Option<i32>, TICTACTOE_SIZE, TICTACTOE_SIZE>::repeat(None);
         for i in 0..TICTACTOE_SIZE {
             for j in 0..TICTACTOE_SIZE {
                 if state[i][j] == Empty {
@@ -45,11 +48,11 @@ impl Minmax {
 
                     // use dynamic programming to avoid revisiting states
                     res[(i, j)] = match self.cache.get(&new_state) {
-                        Some(i) => *i,
+                        Some(i) => Some(*i),
                         None => {
                             let res = self.minmax_rec(new_state, !player);
                             self.cache.insert(new_state, res);
-                            res
+                            Some(res)
                         }
                     }
                 }
@@ -59,9 +62,9 @@ impl Minmax {
         match player {
             X => {
                 self.result.insert(state, res);
-                *res.into_iter().max().unwrap()
+                *res.into_iter().flatten().max().unwrap()
             }
-            O => *res.into_iter().min().unwrap(),
+            O => *res.into_iter().flatten().min().unwrap(),
         }
     }
 }

@@ -5,24 +5,23 @@ use std::{fs, mem};
 
 use byte_unit::Byte;
 use console::style;
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use nalgebra::{SMatrix, SVector};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
-
-use crate::tictactoe_game::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE, TicTacToeGame};
+use crate::tictactoe_game::TicTacToeCell::{Assigned, Empty};
+use crate::tictactoe_game::{TicTacToeCell, TicTacToeGame, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE};
 use crate::tictactoe_minmax::Minmax;
 use crate::tictactoe_solver_nn::{TicTacToeSolverNN, TrainStopCondition};
-use crate::tictactoe_game::TicTacToeCell::{Assigned, Empty};
 use crate::TrainStopCondition::{Accuracy, Epoch, Loss, Perfect};
 
 mod tictactoe_game;
 mod tictactoe_minmax;
 mod tictactoe_solver_nn;
 
-const HIDDEN_LAYER_SIZE: usize = 64;
-const BATCH_SIZE: usize = 36;
+const HIDDEN_LAYER_SIZE: usize = 256;
+const BATCH_SIZE: usize = 40;
 const LEARNING_RATE: f32 = 0.001;
 
 fn main() {
@@ -212,7 +211,8 @@ fn main() {
         .with_prompt("Do you want to play against the network?")
         .default(true)
         .interact()
-        .unwrap() {
+        .unwrap()
+    {
         return;
     }
 
@@ -222,10 +222,11 @@ fn main() {
             .item(format!("{} (plays first)", style("X").blue()))
             .item(format!("{} (plays last)", style("O").red()))
             .interact()
-            .unwrap() {
+            .unwrap()
+        {
             0 => TicTacToePlayer::X,
             1 => TicTacToePlayer::O,
-            _ => panic!()
+            _ => panic!(),
         };
 
         TicTacToeGame::new(player).play(&network, &mut rng);
@@ -233,7 +234,8 @@ fn main() {
             .with_prompt("Do you want to play again?")
             .default(true)
             .interact()
-            .unwrap() {
+            .unwrap()
+        {
             break;
         }
     }
@@ -242,7 +244,7 @@ fn main() {
 }
 
 fn convert_minmax_results_to_dataset(
-    mut map: HashMap<TicTacToeState, SMatrix<i32, TICTACTOE_SIZE, TICTACTOE_SIZE>>,
+    mut map: HashMap<TicTacToeState, SMatrix<Option<i32>, TICTACTOE_SIZE, TICTACTOE_SIZE>>,
 ) -> (Vec<SVector<f32, TICTACTOE_GRID_SIZE>>, Vec<SVector<f32, TICTACTOE_GRID_SIZE>>) {
     let mut xs = Vec::new();
     let mut ys = Vec::new();
@@ -258,14 +260,14 @@ fn convert_minmax_results_to_dataset(
                 };
             }
         }
-        let max_value = *v.iter().max().unwrap();
+        let max_value = *v.iter().flatten().max().unwrap();
         // assign y to 1 only when it's a valid action and has the maximum value for
         // this state
         let mut y = SVector::repeat(1.);
         for i in 0..TICTACTOE_SIZE {
             for j in 0..TICTACTOE_SIZE {
                 let ii = i * TICTACTOE_SIZE + j;
-                if k[i][j] != Empty || v[(i, j)] != max_value {
+                if k[i][j] != Empty || v[(i, j)].unwrap() != max_value {
                     y[ii] = 0.;
                 }
             }
