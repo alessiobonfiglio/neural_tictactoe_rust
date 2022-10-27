@@ -25,7 +25,15 @@ const BATCH_SIZE: usize = 40;
 const LEARNING_RATE: f32 = 0.001;
 
 fn main() {
-    println!("Welcome to Neural TicTacToe (made in rust)\n");
+    println!("Welcome to...\n");
+    println!("╔═╗┬╔╗─┬─┬─┬─┬─┬─╔╦════╗┬╔════╗─┬─╔════╗     ");
+    println!("║║╚╗║║─┼─┼─┼─┼─┼─║║╔╗╔╗║┼║╔╗╔╗║─┼─║╔╗╔╗║     ");
+    println!("║╔╗╚╝╠══╦╗ ╔╦═╦══╣╠╝║║╠╬═╩╣║║╠╩═╦═╩╣║║╠╩═╦══╗");
+    println!("║║╚╗║║║═╣║ ║║╔╣╔╗║║─║║╠╣╔═╝║║║╔╗║╔═╝║║║╔╗║║═╣");
+    println!("║║─║║║║═╣╚═╝║║║╔╗║╚╗║║║║╚═╗║║║╔╗║╚═╗║║║╚╝║║═╣");
+    println!("╚╝─╚═╩══╩═══╩╝╚╝╚╩═╝╚╝╚╩══╝╚╝╚╝╚╩══╝╚╝╚══╩══╝");
+    println!("                                 {}\n", style("Made in Rust").italic());
+    
     let mut rng = StdRng::seed_from_u64(222);
 
     println!("{}", style("Generating Dataset from Minmax...").bold());
