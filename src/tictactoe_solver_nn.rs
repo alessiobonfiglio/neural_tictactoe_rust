@@ -6,8 +6,9 @@ use rand::prelude::*;
 use rand_distr::Normal;
 use serde::{Deserialize, Serialize};
 
-use crate::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_SIZE, TICTACTOE_GRID_SIZE};
+use crate::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE};
 
+/// Representation of the Neural Network used to learn how to play TicTacToe.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TicTacToeSolverNN<const H: usize> {
     hidden_layer_weights: SMatrix<f32, H, TICTACTOE_GRID_SIZE>,
@@ -17,6 +18,7 @@ pub struct TicTacToeSolverNN<const H: usize> {
 }
 
 impl<const H: usize> TicTacToeSolverNN<H> {
+    /// Creates a network using the He initialization for the parameters
     pub fn new<R: Rng + ?Sized>(r: &mut R) -> Self {
         // He initialization for re_lu and sigmoid neurons
         let relu_normal = Normal::new(0., (4. / (H + TICTACTOE_GRID_SIZE) as f32).sqrt()).unwrap();
@@ -30,6 +32,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
         }
     }
 
+    /// Returns the size of each group of parameters in the network
     pub fn get_parameters_size(&self) -> (usize, usize, usize, usize) {
         (
             mem::size_of_val(&self.hidden_layer_weights),
@@ -39,6 +42,8 @@ impl<const H: usize> TicTacToeSolverNN<H> {
         )
     }
 
+    /// Given a state of a game, it returns the which actions should be played.
+    /// `state` is interpreted as a turn of Player X, so it will output which actions can be played to beat (or at least tie) against O.
     pub fn inference(&self, state: TicTacToeState) -> SMatrix<bool, TICTACTOE_SIZE, TICTACTOE_SIZE> {
         let x = SMatrix::<f32, TICTACTOE_SIZE, TICTACTOE_SIZE>::from_fn(|i, j| match state[i][j] {
             TicTacToeCell::Empty => 0.,
@@ -53,6 +58,8 @@ impl<const H: usize> TicTacToeSolverNN<H> {
         y.map(|y| y > 0.).reshape_generic(Const::<TICTACTOE_SIZE>, Const::<TICTACTOE_SIZE>)
     }
 
+    /// Trains the network given a dataset of `(inputs, outputs)` as `dataset`.
+    /// `stop_condition` tell this function when to stop the training procedure.
     pub fn train<const BS: usize, R: Rng + ?Sized>(
         &mut self,
         dataset: (Vec<SVector<f32, TICTACTOE_GRID_SIZE>>, Vec<SVector<f32, TICTACTOE_GRID_SIZE>>),
@@ -71,6 +78,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
         let steps_per_epoch = ds_len / BS;
         loop {
             epoch_counter += 1;
+            // shuffle the dataset at each epoch
             Self::shuffle_dataset(&mut x, &mut y, r);
             let mut loss = 0.;
             let mut corrects = 0;
@@ -89,6 +97,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
                 let loss_grad = out.zip_map(&yy, bce_with_logits_backward) / out.len() as f32;
                 let grad = self.backward(loss_grad, hidden_layer_out, xx);
 
+                // optimizer step
                 optimizer.step(self, grad);
             }
             loss /= steps_per_epoch as f32;
@@ -102,6 +111,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
             ))
             .unwrap();
 
+            // stop when training is complete or the stop_condition is met
             if corrects as usize == 9 * ds_len || stop_condition.should_stop(epoch_counter, accuracy, loss) {
                 break;
             }
@@ -125,7 +135,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
         let mut hidden_layer_output = self.hidden_layer_weights * x;
         //   add bias
         hidden_layer_output.column_iter_mut().for_each(|mut c| c += self.hidden_layer_bias);
-        //    apply relu
+        //   apply relu
         hidden_layer_output.apply(|x| *x = re_lu(*x));
 
         // output layer
@@ -133,6 +143,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
         let mut output = self.output_layer_weights * hidden_layer_output;
         //    add bias
         output.column_iter_mut().for_each(|mut c| c += self.output_layer_bias);
+        // don't apply sigmoid here, so we can apply the cross entropy directly to the logits making it more numerically stable
 
         (output, hidden_layer_output)
     }
@@ -164,6 +175,11 @@ impl<const H: usize> TicTacToeSolverNN<H> {
     }
 }
 
+/// The possible conditions for stopping the training process.
+/// `Perfect`       => when the networks have learned the dataset completely (equivalent to `Accuracy(1.0)`)
+/// `Accuracy(acc)` => when the accuracy is at least `acc`
+/// `Loss(loss)`    => when the accuracy is at most `loss`
+/// `Epoch(e)`      => after `e` epochs
 pub enum TrainStopCondition {
     Perfect,
     Accuracy(f32),

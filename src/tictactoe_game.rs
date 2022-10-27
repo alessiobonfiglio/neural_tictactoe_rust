@@ -41,6 +41,7 @@ pub enum TicTacToeCell {
 }
 
 impl TicTacToeGame {
+    /// Creates a new game with an empty grid, the first playing player being X and the user playing as `player`
     pub fn new(player: TicTacToePlayer) -> Self {
         TicTacToeGame {
             state: TicTacToeState::new(),
@@ -49,12 +50,13 @@ impl TicTacToeGame {
         }
     }
 
+    /// Plays the game interactively against the network `nn`
     pub fn play<const H: usize, R: Rng + ?Sized>(&mut self, nn: &TicTacToeSolverNN<H>, r: &mut R) {
         let mut term = Term::stdout();
         let mut cur_i = 0;
         let mut cur_j = 0;
         loop {
-            // print grid
+            // print the grid
             for i in 0..TICTACTOE_SIZE {
                 for j in 0..TICTACTOE_SIZE - 1 {
                     term.write_fmt(format_args!("{}│", Self::get_cell_string_colored(self.state[i][j]))).unwrap();
@@ -144,6 +146,7 @@ impl TicTacToeGame {
                     }
                 }
 
+                // choose a random action from the predicted ones
                 let (i, j) = possible_actions.choose(r).unwrap();
                 self.state[*i][*j] = Assigned(self.current_player);
                 self.current_player = !self.current_player;
@@ -169,10 +172,12 @@ impl TicTacToeState {
         TicTacToeState { state: [[Empty; 3]; 3] }
     }
 
+    /// Returns `true` if the grid is full
     pub fn is_full(&self) -> bool {
         self.state.iter().flatten().all(|c| *c != Empty)
     }
 
+    /// Returns the player that won the game or `None` if the is no winner in the state
     pub fn winning_player(&self) -> Option<TicTacToePlayer> {
         match self.state {
             [[Assigned(X), Assigned(X), Assigned(X)], _, _]
