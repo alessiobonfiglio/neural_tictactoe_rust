@@ -1,7 +1,5 @@
-use std::fmt;
 use std::io::Write;
 use std::ops::{Index, IndexMut, Not};
-use std::os::linux::raw::stat;
 
 use console::{style, Key, StyledObject, Term};
 use rand::seq::SliceRandom;
