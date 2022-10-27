@@ -6,7 +6,7 @@ use rand::prelude::*;
 use rand_distr::Normal;
 use serde::{Deserialize, Serialize};
 
-use crate::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE};
+use crate::{TICTACTOE_GRID_SIZE, TICTACTOE_SIZE, TicTacToeCell, TicTacToePlayer, TicTacToeState};
 
 /// Representation of the Neural Network used to learn how to play TicTacToe.
 #[derive(Debug, Serialize, Deserialize)]
@@ -50,7 +50,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
             TicTacToeCell::Assigned(TicTacToePlayer::X) => 1.,
             TicTacToeCell::Assigned(TicTacToePlayer::O) => -1.,
         })
-        .reshape_generic(Const::<TICTACTOE_GRID_SIZE>, Const::<1>);
+            .reshape_generic(Const::<TICTACTOE_GRID_SIZE>, Const::<1>);
 
         let (y, _) = self.forward::<1>(x);
 
@@ -62,7 +62,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
     /// `stop_condition` tell this function when to stop the training procedure.
     pub fn train<const BS: usize, R: Rng + ?Sized>(
         &mut self,
-        dataset: (Vec<SVector<f32, TICTACTOE_GRID_SIZE>>, Vec<SVector<f32, TICTACTOE_GRID_SIZE>>),
+        dataset: (Vec<SVector<f32, TICTACTOE_GRID_SIZE>>, Vec<SVector<Option<f32>, TICTACTOE_GRID_SIZE>>),
         lr: f32,
         stop_condition: TrainStopCondition,
         r: &mut R,
@@ -80,28 +80,39 @@ impl<const H: usize> TicTacToeSolverNN<H> {
             epoch_counter += 1;
             // shuffle the dataset at each epoch
             Self::shuffle_dataset(&mut x, &mut y, r);
-            let mut loss = 0.;
+            let mut loss: f32 = 0.;
             let mut corrects = 0;
+            let mut corrects_tot = 0;
             for i in 0..steps_per_epoch {
                 let start = i * BS;
                 let end = start + BS;
                 let xx = SMatrix::<f32, TICTACTOE_GRID_SIZE, BS>::from_columns(&x[start..end]);
-                let yy = SMatrix::<f32, TICTACTOE_GRID_SIZE, BS>::from_columns(&y[start..end]);
+                let yy = SMatrix::<Option<f32>, TICTACTOE_GRID_SIZE, BS>::from_columns(&y[start..end]);
+
+                let yy_tot = yy.as_slice().iter().flatten().count();
 
                 // forward pass
                 let (out, hidden_layer_out) = self.forward(xx);
-                loss += out.zip_map(&yy, bce_with_logits).mean();
-                corrects += out.zip_map(&yy, |x, y| ((x > 0.) == (y > 0.5)) as i32).sum();
+                // compute loss and corrects excluding None ground truth
+                loss +=
+                    out.zip_map(&yy, |x, y| y.map(|yy| bce_with_logits(x, yy))).as_slice().iter().flatten().sum::<f32>() / yy_tot as f32;
+                corrects += out
+                    .zip_map(&yy, |x, y| y.map(|yy| ((x > 0.) == (yy > 0.5)) as usize))
+                    .as_slice()
+                    .iter()
+                    .flatten()
+                    .sum::<usize>();
+                corrects_tot += yy_tot;
 
-                // backward pass
-                let loss_grad = out.zip_map(&yy, bce_with_logits_backward) / out.len() as f32;
+                // backward pass (zero out gradient of None ground truth
+                let loss_grad = out.zip_map(&yy, |g, y| y.map(|yy| bce_with_logits_backward(g, yy)).unwrap_or(0.)) / yy_tot as f32;
                 let grad = self.backward(loss_grad, hidden_layer_out, xx);
 
                 // optimizer step
                 optimizer.step(self, grad);
             }
             loss /= steps_per_epoch as f32;
-            let accuracy = corrects as f32 / (9 * ds_len) as f32;
+            let accuracy = corrects as f32 / corrects_tot as f32;
             term.clear_last_lines(1).unwrap();
             term.write_line(&format!(
                 "{}\t loss: {:.6}\t accuracy: {:.6}",
@@ -109,10 +120,10 @@ impl<const H: usize> TicTacToeSolverNN<H> {
                 loss,
                 accuracy
             ))
-            .unwrap();
+                .unwrap();
 
             // stop when training is complete or the stop_condition is met
-            if corrects as usize == 9 * ds_len || stop_condition.should_stop(epoch_counter, accuracy, loss) {
+            if corrects == corrects_tot || stop_condition.should_stop(epoch_counter, accuracy, loss) {
                 break;
             }
 
@@ -120,7 +131,7 @@ impl<const H: usize> TicTacToeSolverNN<H> {
         }
     }
 
-    fn shuffle_dataset<R: Rng + ?Sized>(x: &mut [SVector<f32, TICTACTOE_GRID_SIZE>], y: &mut [SVector<f32, TICTACTOE_GRID_SIZE>], r: &mut R) {
+    fn shuffle_dataset<R: Rng + ?Sized>(x: &mut [SVector<f32, TICTACTOE_GRID_SIZE>], y: &mut [SVector<Option<f32>, TICTACTOE_GRID_SIZE>], r: &mut R) {
         let ds_len = x.len();
         for i in 0..ds_len {
             let next = r.gen_range(i..ds_len);

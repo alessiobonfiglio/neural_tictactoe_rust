@@ -1,9 +1,9 @@
 use std::io::Write;
 use std::ops::{Index, IndexMut, Not};
 
-use console::{style, Key, StyledObject, Term};
-use rand::seq::SliceRandom;
+use console::{Key, style, StyledObject, Term};
 use rand::Rng;
+use rand::seq::SliceRandom;
 
 use crate::tictactoe_game::TicTacToeCell::{Assigned, Empty};
 use crate::tictactoe_game::TicTacToePlayer::{O, X};

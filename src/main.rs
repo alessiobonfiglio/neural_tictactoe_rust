@@ -20,7 +20,7 @@ mod tictactoe_game;
 mod tictactoe_minmax;
 mod tictactoe_solver_nn;
 
-const HIDDEN_LAYER_SIZE: usize = 256;
+const HIDDEN_LAYER_SIZE: usize = 160;
 const BATCH_SIZE: usize = 40;
 const LEARNING_RATE: f32 = 0.001;
 const SEED: u64 = 1234;
@@ -45,12 +45,13 @@ fn main() {
     println!("Time elapsed for Minmax: {:?}", style(duration).green());
 
     let start = Instant::now();
-    // convert the dataset in a more suitable format (Vec<(input, output)>:
+    // convert the dataset in a more suitable format (Vec<input>, Vec<output>):
     // input  -> 0: empty cell
     //           1: X
     //          -1: O
-    // output -> 0: suboptimal/unfeasible move
-    //           1: optimal move
+    // output -> None:    unfeasible action
+    //           Some(0): suboptimal action
+    //           Some(1): optimal action
     let dataset = convert_minmax_results_to_dataset(minmax_results);
     let duration = start.elapsed();
     println!("Time elapsed for converting the Dataset: {:?}", style(duration).green());
@@ -81,7 +82,7 @@ fn main() {
             network.get_parameters_size().0 / size_of::<f32>(),
             network.get_parameters_size().1 / size_of::<f32>()
         ))
-        .green(),
+            .green(),
         style(Byte::from_bytes((network.get_parameters_size().0 + network.get_parameters_size().1) as u128).get_appropriate_unit(true)).green()
     );
     println!("\t           |\n\t           V");
@@ -93,7 +94,7 @@ fn main() {
             network.get_parameters_size().2 / size_of::<f32>(),
             network.get_parameters_size().3 / size_of::<f32>()
         ))
-        .green(),
+            .green(),
         style(Byte::from_bytes((network.get_parameters_size().2 + network.get_parameters_size().3) as u128).get_appropriate_unit(true)).green()
     );
     println!(
@@ -102,14 +103,14 @@ fn main() {
             "{}",
             (network.get_parameters_size().0 + network.get_parameters_size().1 + network.get_parameters_size().2 + network.get_parameters_size().3) / size_of::<f32>()
         ))
-        .green(),
+            .green(),
         style(
             Byte::from_bytes(
                 (network.get_parameters_size().0 + network.get_parameters_size().1 + network.get_parameters_size().2 + network.get_parameters_size().3) as u128
             )
-            .get_appropriate_unit(true)
+                .get_appropriate_unit(true)
         )
-        .green()
+            .green()
     );
     println!("Time elapsed for constructing Neural Network Model: {:?}\n", style(duration).green());
 
@@ -269,7 +270,7 @@ fn main() {
 
 fn convert_minmax_results_to_dataset(
     mut map: HashMap<TicTacToeState, SMatrix<Option<i32>, TICTACTOE_SIZE, TICTACTOE_SIZE>>,
-) -> (Vec<SVector<f32, TICTACTOE_GRID_SIZE>>, Vec<SVector<f32, TICTACTOE_GRID_SIZE>>) {
+) -> (Vec<SVector<f32, TICTACTOE_GRID_SIZE>>, Vec<SVector<Option<f32>, TICTACTOE_GRID_SIZE>>) {
     let mut xs = Vec::new();
     let mut ys = Vec::new();
     for (k, v) in map.drain() {
@@ -286,13 +287,17 @@ fn convert_minmax_results_to_dataset(
         }
         let max_value = *v.iter().flatten().max().unwrap();
         // assign y to 1 only when it's a valid action and has the maximum value for
-        // this state
-        let mut y = SVector::repeat(1.);
+        // this state, Some(0.) if the action is non-optimal and None if it's invalid
+        let mut y = SVector::repeat(None);
         for i in 0..TICTACTOE_SIZE {
             for j in 0..TICTACTOE_SIZE {
                 let ii = i * TICTACTOE_SIZE + j;
-                if k[i][j] != Empty || v[(i, j)].unwrap() != max_value {
-                    y[ii] = 0.;
+                if let Some(value) = v[(i, j)] {
+                    if value == max_value {
+                        y[ii] = Some(1.);
+                    } else {
+                        y[ii] = Some(0.);
+                    }
                 }
             }
         }
