@@ -4,11 +4,9 @@ use console::{style, Term};
 use nalgebra::{Const, SMatrix, SVector};
 use rand::prelude::*;
 use rand_distr::Normal;
-
 use serde::{Deserialize, Serialize};
 
-use crate::TICTACTOE_GRID_SIZE;
-use crate::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_SIZE};
+use crate::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_SIZE, TICTACTOE_GRID_SIZE};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TicTacToeSolverNN<const H: usize> {

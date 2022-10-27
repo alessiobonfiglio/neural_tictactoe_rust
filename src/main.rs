@@ -11,11 +11,13 @@ use rand::SeedableRng;
 
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 
-use crate::tictactoe_minmax::{Minmax, TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE};
+use crate::tictactoe_game::{TicTacToeCell, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE, TicTacToeGame};
+use crate::tictactoe_minmax::Minmax;
 use crate::tictactoe_solver_nn::{TicTacToeSolverNN, TrainStopCondition};
-use crate::TicTacToeCell::{Assigned, Empty};
+use crate::tictactoe_game::TicTacToeCell::{Assigned, Empty};
 use crate::TrainStopCondition::{Accuracy, Epoch, Loss, Perfect};
 
+mod tictactoe_game;
 mod tictactoe_minmax;
 mod tictactoe_solver_nn;
 
@@ -33,6 +35,7 @@ fn main() {
     minmax_results.extend(Minmax::execute(TicTacToePlayer::O));
     let duration = start.elapsed();
     println!("Time elapsed for Minmax: {:?}", style(duration).green());
+
     let start = Instant::now();
     // convert the dataset in a more suitable format (Vec<(input, output)>:
     // input  -> 0: empty cell
@@ -155,7 +158,7 @@ fn main() {
             Loss(l.parse::<f32>().unwrap())
         }
         4 => {
-            let path: String = Input::with_theme(&ColorfulTheme::default())
+            Input::with_theme(&ColorfulTheme::default())
                 .with_prompt("Enter the filename")
                 .validate_with(|input: &String| -> Result<(), &str> {
                     match fs::read_to_string(input) {
@@ -184,7 +187,7 @@ fn main() {
         println!("Time elapsed for training the model: {:?}\n", style(duration).green());
 
         loop {
-            if !Confirm::new()
+            if !Confirm::with_theme(&ColorfulTheme::default())
                 .with_prompt("Do you want to save parameters to file?")
                 .default(false)
                 .interact()
@@ -204,6 +207,38 @@ fn main() {
             }
         }
     }
+
+    if !Confirm::with_theme(&ColorfulTheme::default())
+        .with_prompt("Do you want to play against the network?")
+        .default(true)
+        .interact()
+        .unwrap() {
+        return;
+    }
+
+    loop {
+        let player = match Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("Select the player you want to use")
+            .item(format!("{} (plays first)", style("X").blue()))
+            .item(format!("{} (plays last)", style("O").red()))
+            .interact()
+            .unwrap() {
+            0 => TicTacToePlayer::X,
+            1 => TicTacToePlayer::O,
+            _ => panic!()
+        };
+
+        TicTacToeGame::new(player).play(&network, &mut rng);
+        if !Confirm::with_theme(&ColorfulTheme::default())
+            .with_prompt("Do you want to play again?")
+            .default(true)
+            .interact()
+            .unwrap() {
+            break;
+        }
+    }
+
+    println!("{}", style("Bye bye!").bold());
 }
 
 fn convert_minmax_results_to_dataset(
