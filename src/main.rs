@@ -87,6 +87,21 @@ fn main() {
         .green(),
         style(Byte::from_bytes((network.get_parameters_size().2 + network.get_parameters_size().3) as u128).get_appropriate_unit(true)).green()
     );
+    println!(
+        "Total number of parameters: {} (size: {})",
+        style(format!(
+            "{}",
+            (network.get_parameters_size().0 + network.get_parameters_size().1 + network.get_parameters_size().2 + network.get_parameters_size().3) / size_of::<f32>()
+        ))
+        .green(),
+        style(
+            Byte::from_bytes(
+                (network.get_parameters_size().0 + network.get_parameters_size().1 + network.get_parameters_size().2 + network.get_parameters_size().3) as u128
+            )
+            .get_appropriate_unit(true)
+        )
+        .green()
+    );
     println!("Time elapsed for constructing Neural Network Model: {:?}\n", style(duration).green());
 
     let mut skip_traing = false;
