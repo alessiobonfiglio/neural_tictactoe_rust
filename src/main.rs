@@ -1,17 +1,17 @@
+use std::{fs, mem};
 use std::collections::HashMap;
 use std::mem::size_of;
 use std::time::Instant;
-use std::{fs, mem};
 
 use byte_unit::Byte;
 use console::style;
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
+use dialoguer::{Confirm, Input, Select, theme::ColorfulTheme};
 use nalgebra::{SMatrix, SVector};
 use rand::rngs::StdRng;
 use rand::SeedableRng;
 
+use crate::tictactoe_game::{TICTACTOE_GRID_SIZE, TICTACTOE_SIZE, TicTacToeCell, TicTacToeGame, TicTacToePlayer, TicTacToeState};
 use crate::tictactoe_game::TicTacToeCell::{Assigned, Empty};
-use crate::tictactoe_game::{TicTacToeCell, TicTacToeGame, TicTacToePlayer, TicTacToeState, TICTACTOE_GRID_SIZE, TICTACTOE_SIZE};
 use crate::tictactoe_minmax::Minmax;
 use crate::tictactoe_solver_nn::{TicTacToeSolverNN, TrainStopCondition};
 use crate::TrainStopCondition::{Accuracy, Epoch, Loss, Perfect};
@@ -23,6 +23,7 @@ mod tictactoe_solver_nn;
 const HIDDEN_LAYER_SIZE: usize = 256;
 const BATCH_SIZE: usize = 40;
 const LEARNING_RATE: f32 = 0.001;
+const SEED: u64 = 1234;
 
 fn main() {
     println!("Welcome to...\n");
@@ -33,8 +34,8 @@ fn main() {
     println!("║║─║║║║═╣╚═╝║║║╔╗║╚╗║║║║╚═╗║║║╔╗║╚═╗║║║╚╝║║═╣");
     println!("╚╝─╚═╩══╩═══╩╝╚╝╚╩═╝╚╝╚╩══╝╚╝╚╝╚╩══╝╚╝╚══╩══╝");
     println!("                                 {}\n", style("Made in Rust").italic());
-    
-    let mut rng = StdRng::seed_from_u64(222);
+
+    let mut rng = StdRng::seed_from_u64(SEED);
 
     println!("{}", style("Generating Dataset from Minmax...").bold());
     let start = Instant::now();
