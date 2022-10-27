@@ -1,9 +1,9 @@
 use std::io::Write;
 use std::ops::{Index, IndexMut, Not};
 
-use console::{Key, style, StyledObject, Term};
-use rand::Rng;
+use console::{style, Key, StyledObject, Term};
 use rand::seq::SliceRandom;
+use rand::Rng;
 
 use crate::tictactoe_game::TicTacToeCell::{Assigned, Empty};
 use crate::tictactoe_game::TicTacToePlayer::{O, X};
@@ -72,20 +72,20 @@ impl TicTacToeGame {
 
             if let Some(winner) = self.state.winning_player() {
                 if winner == self.user_player {
-                    println!("You won!\n");
+                    println!("You {}!\n", style("won").green());
                 } else {
-                    println!("You lost!\n");
+                    println!("You {}!\n", style("lost").red());
                 }
                 break;
             }
             if self.state.is_full() {
-                println!("It's a tie!\n");
+                println!("It's a {}!\n", style("tie").yellow());
                 break;
             }
 
             if self.current_player == self.user_player {
                 term.show_cursor().unwrap();
-                term.move_cursor_up(5).unwrap();
+                term.move_cursor_up(2 * TICTACTOE_SIZE - 1).unwrap();
                 term.move_cursor_down(2 * cur_i).unwrap();
                 term.move_cursor_right(2 * cur_j).unwrap();
                 loop {
@@ -124,6 +124,8 @@ impl TicTacToeGame {
                         _ => (),
                     }
                 }
+                term.move_cursor_left(2 * cur_j).unwrap();
+                term.move_cursor_down(2 * (TICTACTOE_SIZE - 1 - cur_i) + 1).unwrap();
                 term.hide_cursor().unwrap();
             } else {
                 let pred = nn.inference(self.state.to_solver_state(self.user_player));
@@ -151,8 +153,6 @@ impl TicTacToeGame {
                 self.state[*i][*j] = Assigned(self.current_player);
                 self.current_player = !self.current_player;
             }
-
-            term.move_cursor_to(0, term.size().1 as usize).unwrap();
             term.clear_last_lines(2 * TICTACTOE_SIZE - 1).unwrap();
         }
     }
