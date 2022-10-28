@@ -37,14 +37,18 @@ fn main() {
 
     let mut rng = StdRng::seed_from_u64(SEED);
 
+    // create the dataset
     println!("{}", style("Generating Dataset from Minmax...").bold());
     let start = Instant::now();
+
     let mut minmax_results = Minmax::execute(TicTacToePlayer::X);
     minmax_results.extend(Minmax::execute(TicTacToePlayer::O));
+
     let duration = start.elapsed();
     println!("Time elapsed for Minmax: {:?}", style(duration).green());
 
     let start = Instant::now();
+
     // convert the dataset in a more suitable format (Vec<input>, Vec<output>):
     // input  -> 0: empty cell
     //           1: X
@@ -53,6 +57,7 @@ fn main() {
     //           Some(0): suboptimal action
     //           Some(1): optimal action
     let dataset = convert_minmax_results_to_dataset(minmax_results);
+    
     let duration = start.elapsed();
     println!("Time elapsed for converting the Dataset: {:?}", style(duration).green());
     assert_eq!(
@@ -68,9 +73,12 @@ fn main() {
         style(Byte::from_bytes(2 * mem::size_of_val(&dataset.0[..]) as u128).get_appropriate_unit(true)).green()
     );
 
+    // create the network
     println!("{}", style("Constructing Neural Network Model...").bold());
     let start = Instant::now();
+
     let mut network = TicTacToeSolverNN::<HIDDEN_LAYER_SIZE>::new(&mut rng);
+
     let duration = start.elapsed();
     println!("\t      Input layer            (size: {})", style(TICTACTOE_GRID_SIZE).green());
     println!("\t           |\n\t           V");
@@ -114,6 +122,7 @@ fn main() {
     );
     println!("Time elapsed for constructing Neural Network Model: {:?}\n", style(duration).green());
 
+    // ask the user about the stopping condition of the training
     let mut skip_traing = false;
     let selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select how to train the network")
@@ -201,12 +210,15 @@ fn main() {
         _ => panic!(),
     };
 
+    //train the network
     if !skip_traing {
         println!("{}", style("Begin training...").bold());
         println!("\tBatch size: {}", style(BATCH_SIZE).green());
         println!("\tLearning rate: {}\n", style(LEARNING_RATE).green());
         let start = Instant::now();
+
         network.train::<BATCH_SIZE, _>(dataset, LEARNING_RATE, train_stop_condition, &mut rng);
+
         let duration = start.elapsed();
         println!("Time elapsed for training the model: {:?}\n", style(duration).green());
 
@@ -232,6 +244,7 @@ fn main() {
         }
     }
 
+    // play against the network
     if !Confirm::with_theme(&ColorfulTheme::default())
         .with_prompt("Do you want to play against the network?")
         .default(true)
@@ -255,6 +268,7 @@ fn main() {
         };
 
         TicTacToeGame::new(player).play(&network, &mut rng);
+
         if !Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt("Do you want to play again?")
             .default(true)
